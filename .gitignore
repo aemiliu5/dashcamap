@@ -1,0 +1,7 @@
+# Ignore frames and frames2 folders
+/frames/
+/frames2/
+
+*.mp4
+*.html
+recognized*.txt

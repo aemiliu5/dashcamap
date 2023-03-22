@@ -13,7 +13,7 @@ Upon running dashcamap with a video file, it will:
 ## Requirements
 * numpy
 * folium
-* argparse
+* opencv-python
 * [tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
 
 ## Usage

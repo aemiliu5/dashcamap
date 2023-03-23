@@ -12,10 +12,10 @@ from os import path
 
 # Pytesseract Initialization & Config
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
-custom_config = r'-c tessedit_char_whitelist="ENSW.KM/Henswkmh0123456789 " --oem 3 --psm 7 -l eng '
+custom_config = r'-c tessedit_char_whitelist="ENSW.KM/PHenswkmh0123456789 " --oem 3 --psm 7 -l eng'
 
 # --- ARGUMENT PARSING ---
-parser = argparse.ArgumentParser(description='Dashcam')
+parser = argparse.ArgumentParser(description='dashcamap.py - A Python script that extracts GPS data from dashcam videos using OCR.')
 
 parser.add_argument('-c', '--clear', 	action='store_true', 	help='Clears all generated data on finish.')
 parser.add_argument('-f', '--frame', 	action='store_true', 	help='Print data per frame file.')
@@ -27,8 +27,9 @@ parser.add_argument('--skip-cleanup', 	action='store_true', 	help='Skip cleanup 
 parser.add_argument('--simple-markers', action='store_true', 	help="Don't include inbetween markers in the generated map.")
 parser.add_argument('--no-markers', 	action='store_true', 	help="Don't include any markers in the generated map.")
 parser.add_argument('--set-crop', 		type=int, default=[1380,1440,20,620], nargs=4, help="Define cropping area")
+parser.add_argument('--preview-crop', 	action='store_true', 	help="Preview cropping area")
 parser.add_argument('--flush', 			action='store_true', 	help='Flush leftover data.')
-parser.add_argument('--fps', 			type=int, default=30,	help='Set framerate')
+parser.add_argument('--fps', 			type=int, default=30,	help='Framerate of video to check (GPS updates usually every second)')
 parser.add_argument('file', 			nargs='?', default=None, type=str, help="File")
 
 args = parser.parse_args()
@@ -45,11 +46,26 @@ if args.flush:
 	print("Files successfully deleted.")
 	quit()
 
+# --- PREVIEW CROP ---
+if args.preview_crop:
+	video = cv2.VideoCapture(args.file)
+	
+	if not video.isOpened():
+		raise Exception("Error opening video file.")
+	
+	ret, frame = video.read()
+
+	if ret == True:
+		crop = frame[args.set_crop[0]:args.set_crop[1], args.set_crop[2]:args.set_crop[3]] 
+		cv2.imshow("Crop preview", crop)
+	
+	cv2.waitKey()
+	video.release()
+	cv2.destroyAllWindows()
+	quit()
+
 # --- VARIABLES ---
-regexCoords = re.compile(r"\b\d{1,3}\sKM/H\s[NS]\d{1,2}\.\d{6}\s[EW]\d{1,3}\.\d{6}\b")
-coords = []
-lat = 0.0
-lon = 0.0
+regexCoords = re.compile(r"\b\d{1,3}\s(KM/H|MPH)\s[NS]\d{1,2}\.\d{6}\s[EW]\d{1,3}\.\d{6}\b")
 frameCount = 0
 
 # ----- FRAME EXTRACTION -----
@@ -132,37 +148,41 @@ if not args.skip_process:
 # Perform OCR on the processed images to extract GPS coordinates.
 print("Analyzing frames...")
 
-# TODO CHECK IF FILES EXIST
-with open("recognized.txt", "r") as file:
-    lines = file.readlines()
+lat = 0.0
+lon = 0.0
+coords = []
 
-with open("recognized2.txt", "a+") as file2:
-	for line in lines:
-		match = regexCoords.search(line)
-		
-		if match:
-			regexLat = re.search(r"[NS](\d+\.\s*\d+)", line)
-			regexLon = re.search(r"[EW](\d+\.\s*\d+)", line)
+if path.exists('recognized.txt'):
+	with open("recognized.txt", "r") as file:
+		lines = file.readlines()
+
+	with open("recognized2.txt", "a+") as file2:
+		for line in lines:
+			match = regexCoords.search(line)
 			
-			if regexLat:
-				if 'N' in line:
-					lat = float(regexLat.group(1).replace(" ", ""))
-				else:
-					lat = float('-' + regexLat.group(1).replace(" ", ""))
+			if match:
+				regexLat = re.search(r"[NS](\d+\.\s*\d+)", line)
+				regexLon = re.search(r"[EW](\d+\.\s*\d+)", line)
+				
+				if regexLat:
+					if 'N' in line:
+						lat = float(regexLat.group(1).replace(" ", ""))
+					else:
+						lat = float('-' + regexLat.group(1).replace(" ", ""))
 
-			if regexLon:
-				if 'E' in line:
-					lon = float(regexLon.group(1).replace(" ", ""))
-				else:
-					lon = float('-' + regexLon.group(1).replace(" ", ""))
+				if regexLon:
+					if 'E' in line:
+						lon = float(regexLon.group(1).replace(" ", ""))
+					else:
+						lon = float('-' + regexLon.group(1).replace(" ", ""))
 
-			if regexLat and regexLon:
-				coords.append([lat, lon])
+				if regexLat and regexLon:
+					coords.append([lat, lon])
 
-			file2.write(match.group() + "\n")
+				file2.write(match.group() + "\n")
 
-file.close()
-file2.close()
+	file.close()
+	file2.close()
 
 # ----- COORDINATES CLEANUP -----
 # Scans all analyzed coordinates for possible irregularities and if found, removes them.

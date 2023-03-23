@@ -50,6 +50,7 @@ Possible arguments:
 --simple-markers      Include only start and end markers.
 --no-markers          Generates a map with just a line and no markers
 --set-crop            Sets cropping parameters. (default is for a VIOFO A119)
+--preview-crop        Generate a preview window with a single cropped frame.
 
 ```
 
